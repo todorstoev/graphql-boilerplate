@@ -2,8 +2,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const graphqlHttp = require("express-graphql");
 const { buildSchema } = require("graphql");
+const mongoose = require("mongoose");
 
 const app = express();
+
+const events = [];
 
 let port = process.env.PORT || 3000;
 
@@ -13,12 +16,28 @@ app.use(
   "/graphql",
   graphqlHttp({
     schema: buildSchema(`
-        type RootQuery {
-            events: [String!]!
+
+        type Event { 
+          _id: ID!
+          title: String!
+          description: String!
+          price: Float!
+          date: String!
         }
 
+        input EventInput {
+          title:String!
+          description:String!
+          price:Float!
+          date:String!
+        }
+
+        type RootQuery {
+            events: [Event!]!
+        } 
+
         type RootMutation {
-            createEvent(name:String) : String
+            createEvent(eventInput:EventInput) : Event
         }
 
         schema {
@@ -28,15 +47,33 @@ app.use(
     `),
     rootValue: {
       events: () => {
-        return ["Romantic", "Sailing", "All night coding"];
+        return events;
       },
       createEvent: args => {
-        const eventName = args.name;
-        return eventName;
+        const event = {
+          _id: Math.random().toString(),
+          title: args.eventInput.title,
+          description: args.eventInput.description,
+          price: +args.eventInput.price,
+          date: args.eventInput.date
+        };
+        events.push(event);
+
+        return event;
       }
     },
     graphiql: true
   })
 );
 
-app.listen(port);
+mongoose
+  .connect(
+    `mongodb+srv://${process.env.MONGO_USER}:${
+      process.env.MONGO_PASSWORD
+    }@graphqlboler-ni1gt.mongodb.net/test?retryWrites=true`,
+    { useNewUrlParser: true }
+  )
+  .then(res => {
+    app.listen(port);
+  })
+  .catch(err => console.log(err));
