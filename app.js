@@ -4,9 +4,9 @@ const graphqlHttp = require("express-graphql");
 const { buildSchema } = require("graphql");
 const mongoose = require("mongoose");
 
-const app = express();
+const Event = require("./models/events");
 
-const events = [];
+const app = express();
 
 let port = process.env.PORT || 3000;
 
@@ -17,7 +17,7 @@ app.use(
   graphqlHttp({
     schema: buildSchema(`
 
-        type Event { 
+        type Event {
           _id: ID!
           title: String!
           description: String!
@@ -34,7 +34,7 @@ app.use(
 
         type RootQuery {
             events: [Event!]!
-        } 
+        }
 
         type RootMutation {
             createEvent(eventInput:EventInput) : Event
@@ -47,19 +47,42 @@ app.use(
     `),
     rootValue: {
       events: () => {
-        return events;
+        return Event.find()
+          .then(events => {
+            return events.map(event => {
+              return { ...event._doc, _id: event.id };
+            });
+          })
+          .catch(err => {
+            throw err;
+          });
       },
       createEvent: args => {
-        const event = {
-          _id: Math.random().toString(),
+        // const event = {
+        //   _id: Math.random().toString(),
+        //   title: args.eventInput.title,
+        //   description: args.eventInput.description,
+        //   price: +args.eventInput.price,
+        //   date: args.eventInput.date
+        // };
+
+        const event = new Event({
           title: args.eventInput.title,
           description: args.eventInput.description,
           price: +args.eventInput.price,
-          date: args.eventInput.date
-        };
-        events.push(event);
+          date: new Date(args.eventInput.date)
+        });
 
-        return event;
+        return event
+          .save()
+          .then(res => {
+            console.log(res);
+            return { ...res._doc };
+          })
+          .catch(err => {
+            console.log(err);
+            throw err;
+          });
       }
     },
     graphiql: true
@@ -67,10 +90,14 @@ app.use(
 );
 
 mongoose
+  // .connect(
+  //   `mongodb+srv://${process.env.MONGO_USER}:${
+  //     process.env.MONGO_PASSWORD
+  //   }@cluster0-ni1gt.mongodb.net/test?retryWrites=true`,
+  //   { useNewUrlParser: true }
+  // )
   .connect(
-    `mongodb+srv://${process.env.MONGO_USER}:${
-      process.env.MONGO_PASSWORD
-    }@graphqlboler-ni1gt.mongodb.net/test?retryWrites=true`,
+    "mongodb://localhost:27017/myapp",
     { useNewUrlParser: true }
   )
   .then(res => {
